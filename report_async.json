@@ -1,0 +1,51 @@
+{
+    "total_products_analyzed": 20,
+    "average_price_by_category": {
+        "groceries": 7.790000000000001,
+        "beauty": 13.39,
+        "fragrances": 83.99000000000001,
+        "furniture": 1199.9899999999998
+    },
+    "top_products": [
+        {
+            "id": 14,
+            "name": "Knoll Saarinen Executive Conference Chair",
+            "price": 499.99,
+            "category": "furniture",
+            "average_review_score": 4.9,
+            "review_count": 108
+        },
+        {
+            "id": 13,
+            "name": "Bedside Table African Cherry",
+            "price": 299.99,
+            "category": "furniture",
+            "average_review_score": 4.8,
+            "review_count": 101
+        },
+        {
+            "id": 12,
+            "name": "Annibale Colombo Sofa",
+            "price": 2499.99,
+            "category": "furniture",
+            "average_review_score": 4.7,
+            "review_count": 94
+        },
+        {
+            "id": 11,
+            "name": "Annibale Colombo Bed",
+            "price": 1899.99,
+            "category": "furniture",
+            "average_review_score": 4.6,
+            "review_count": 87
+        },
+        {
+            "id": 10,
+            "name": "Gucci Bloom Eau de",
+            "price": 79.99,
+            "category": "fragrances",
+            "average_review_score": 4.5,
+            "review_count": 80
+        }
+    ]
+}
