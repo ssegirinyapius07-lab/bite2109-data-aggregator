@@ -11,8 +11,7 @@ The application demonstrates REST API interaction, web scraping, custom data str
 The application uses a modular design:
 
 * `config.py` — stores API, scraper, timeout, and product-limit constants.
-* `api_fetcher.py` — retrieves product data using `requests`, with caching and error handling.
-* `offline_data.py` — provides backup product data when the external API is unavailable.
+* `api_fetcher.py` — retrieves product data using `requests`, with caching, timeouts, status-code validation, and connection error handling.
 * `scraper.py` — uses BeautifulSoup to extract review scores and review counts.
 * `data_models.py` — defines the custom `Product` data model.
 * `threaded_fetcher.py` — performs review requests concurrently using `ThreadPoolExecutor`.
@@ -43,9 +42,9 @@ The analyzer then calculates the average price per category and identifies the f
 
 `api_fetcher.py` uses the `requests` library to obtain product ID, name, price, and category from the REST API. It uses `functools.lru_cache` to cache the API-fetch operation.
 
-Error handling covers request failures, timeouts, unsuccessful HTTP responses, and invalid API data. If the external API is unavailable, prepared offline data can be used so the application can continue operating.
+Error handling covers connection failures, timeouts, unsuccessful HTTP responses, and invalid API data. The fetcher accepts product data only from HTTP 200 responses; HTTP 404, HTTP 500, other non-200 responses, connection failures, timeouts, and malformed responses return no product data. No offline fallback is used, so stale or fabricated data cannot be presented as live API data.
 
-For each product, `scraper.py` requests the corresponding simulated review page. BeautifulSoup extracts the average review score and review count. Missing review pages, request failures, and invalid review data are handled without terminating the complete aggregation.
+For each product, `scraper.py` requests the corresponding simulated review page. BeautifulSoup extracts the average review score and review count. Missing review pages, request failures, timeouts, non-200 responses, and invalid review data are handled without terminating the complete aggregation. A failed review request returns no review record rather than a fabricated zero score.
 
 ## 5. Concurrency Approaches
 
@@ -87,17 +86,23 @@ The cProfile totals include program startup and profiling overhead, so the direc
 
 ## 7. Testing
 
-The project contains five unit tests. They verify:
+The project contains eleven unit tests. They verify:
 
 1. Products without reviews are excluded.
 2. Category average prices are calculated correctly.
 3. The five highest-rated products are identified.
 4. The `Product` class uses `__slots__`.
 5. API data can be processed using `unittest.mock.patch` to simulate a network response.
+6. HTTP 404 and HTTP 500 API responses return no data.
+7. API timeout errors return no data.
+8. API connection failures return no data.
+9. HTTP 404 and HTTP 500 review responses do not fabricate review records.
+10. Review timeout errors return no data.
+11. Valid HTTP 200 review responses are parsed correctly.
 
 The test suite passed with:
 
-**5 tests passed, 0 failed.**
+**11 tests passed, 0 failed.**
 
 Run tests with:
 
