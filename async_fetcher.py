@@ -8,70 +8,124 @@ from data_models import Product
 
 
 async def fetch_api_products(session):
-    """Asynchronously fetch products from the API."""
+    """Asynchronously fetch products; only HTTP 200 may produce data."""
 
     try:
         async with session.get(
             API_URL,
             params={"limit": MAX_PRODUCTS},
         ) as response:
-            response.raise_for_status()
-            data = await response.json()
+            if response.status != 200:
+                if response.status == 404:
+                    print("Async API returned HTTP 404. No product data returned.")
+                elif response.status == 500:
+                    print("Async API returned HTTP 500. No product data returned.")
+                else:
+                    print(
+                        f"Async API returned HTTP {response.status}. "
+                        "No product data returned."
+                    )
+                return []
 
-            return [
-                Product(
-                    id=int(item["id"]),
-                    name=item["title"],
-                    price=float(item["price"]),
-                    category=item["category"],
+            try:
+                data = await response.json()
+            except (aiohttp.ContentTypeError, ValueError) as error:
+                print(f"Invalid async API response data: {error}")
+                return []
+
+            product_data = data.get("products", [])
+
+            if not isinstance(product_data, list):
+                print(
+                    "Async API returned an invalid products field. "
+                    "No product data returned."
                 )
-                for item in data.get("products", [])
-            ]
+                return []
 
-    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-        print(f"Async API request failed: {error}")
+            products = []
+
+            for item in product_data:
+                try:
+                    products.append(
+                        Product(
+                            id=int(item["id"]),
+                            name=item["title"],
+                            price=float(item["price"]),
+                            category=item["category"],
+                        )
+                    )
+                except (KeyError, TypeError, ValueError) as error:
+                    print(f"Skipping invalid async product data: {error}")
+
+            return products
+
+    except asyncio.TimeoutError as error:
+        print(f"Async API request timed out after {REQUEST_TIMEOUT}s: {error}")
         return []
-
-    except (KeyError, TypeError, ValueError) as error:
-        print(f"Invalid API data: {error}")
+    except aiohttp.ClientConnectionError as error:
+        print(f"Could not connect to async API: {error}")
+        return []
+    except aiohttp.ClientError as error:
+        print(f"Async API request failed: {error}")
         return []
 
 
 async def scrape_review(session, product):
-    """Asynchronously scrape one product review page."""
+    """Asynchronously scrape one review page; return no data on failure."""
 
     review_url = f"{SCRAPE_URL.rstrip('/')}/{product.id}"
 
     try:
         async with session.get(review_url) as response:
-            if response.status == 404:
-                return Product(
-                    id=product.id,
-                    name=product.name,
-                    price=product.price,
-                    category=product.category,
+            if response.status != 200:
+                if response.status == 404:
+                    print(
+                        f"Async review page for product {product.id} "
+                        "returned HTTP 404. No review data returned."
+                    )
+                elif response.status == 500:
+                    print(
+                        f"Async review service returned HTTP 500 for "
+                        f"product {product.id}. No review data returned."
+                    )
+                else:
+                    print(
+                        f"Async review page for product {product.id} "
+                        f"returned HTTP {response.status}. "
+                        "No review data returned."
+                    )
+                return None
+
+            try:
+                html = await response.text()
+            except UnicodeError as error:
+                print(
+                    f"Invalid review response encoding for product "
+                    f"{product.id}: {error}"
                 )
-
-            response.raise_for_status()
-
-            html = await response.text()
+                return None
 
             soup = BeautifulSoup(html, "html.parser")
 
             score_element = soup.select_one(".average-score")
             count_element = soup.select_one(".review-count")
 
-            avg_score = (
-                float(score_element.get_text(strip=True))
-                if score_element
-                else 0.0
-            )
+            if score_element is None or count_element is None:
+                print(
+                    f"Review page for product {product.id} is missing "
+                    "required review fields. No review data returned."
+                )
+                return None
 
-            review_count = (
-                int(count_element.get_text(strip=True))
-                if count_element
-                else 0
-            )
+            try:
+                avg_score = float(score_element.get_text(strip=True))
+                review_count = int(count_element.get_text(strip=True))
+            except (TypeError, ValueError, AttributeError) as error:
+                print(
+                    f"Invalid review data for product "
+                    f"{product.id}: {error}"
+                )
+                return None
 
             return Product(
                 id=product.id,
@@ -82,35 +136,28 @@ async def scrape_review(session, product):
                 review_count=review_count,
             )
 
-    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+    except asyncio.TimeoutError as error:
+        print(
+            f"Async review request timed out after {REQUEST_TIMEOUT}s "
+            f"for product {product.id}: {error}"
+        )
+        return None
+    except aiohttp.ClientConnectionError as error:
+        print(
+            f"Could not connect to async review service for product "
+            f"{product.id}: {error}"
+        )
+        return None
+    except aiohttp.ClientError as error:
         print(
             f"Async review request failed for product "
             f"{product.id}: {error}"
         )
-
-        return Product(
-            id=product.id,
-            name=product.name,
-            price=product.price,
-            category=product.category,
-        )
-
-    except (TypeError, ValueError) as error:
-        print(
-            f"Invalid review data for product "
-            f"{product.id}: {error}"
-        )
-
-        return Product(
-            id=product.id,
-            name=product.name,
-            price=product.price,
-            category=product.category,
-        )
+        return None
 
 
 async def fetch_all_async():
-    """Fetch API data and review pages asynchronously."""
+    """Fetch API data and successful review pages asynchronously."""
 
     timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
 
@@ -122,4 +169,6 @@ async def fetch_all_async():
             for product in products
         ]
 
-        return await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+
+        return [product for product in results if product is not None]
