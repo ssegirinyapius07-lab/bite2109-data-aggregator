@@ -1,5 +1,7 @@
 import argparse
 import asyncio
+import cProfile
+import pstats
 import time
 
 from analyzer import analyze_products
@@ -30,6 +32,41 @@ def run_async():
     return products, elapsed
 
 
+def run_selected_mode(mode):
+    """Run the selected aggregation mode."""
+    if mode == "threads":
+        print("Starting ThreadPoolExecutor aggregation...")
+        products, elapsed = run_threads()
+        mode_name = "ThreadPoolExecutor"
+    else:
+        print("Starting asyncio + aiohttp aggregation...")
+        products, elapsed = run_async()
+        mode_name = "Asyncio + aiohttp"
+
+    return products, elapsed, mode_name
+
+
+def profile_selected_mode(mode):
+    """Run the selected mode under cProfile and save the profiler output."""
+    profile_file = f"profile_{mode}.prof"
+    profiler = cProfile.Profile()
+
+    products, elapsed, mode_name = profiler.runcall(
+        run_selected_mode,
+        mode,
+    )
+
+    profiler.dump_stats(profile_file)
+
+    print(f"\nProfiler output saved to {profile_file}.")
+    print("\nTop profiling results by cumulative time:")
+
+    stats = pstats.Stats(profiler)
+    stats.strip_dirs().sort_stats("cumulative").print_stats(10)
+
+    return products, elapsed, mode_name
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Multi-Threaded Data Aggregator"
@@ -42,17 +79,22 @@ def main():
         help="Choose the data aggregation approach.",
     )
 
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Run the selected mode with cProfile.",
+    )
+
     args = parser.parse_args()
 
-    if args.mode == "threads":
-        print("Starting ThreadPoolExecutor aggregation...")
-        products, elapsed = run_threads()
-        mode_name = "ThreadPoolExecutor"
-
+    if args.profile:
+        products, elapsed, mode_name = profile_selected_mode(
+            args.mode
+        )
     else:
-        print("Starting asyncio + aiohttp aggregation...")
-        products, elapsed = run_async()
-        mode_name = "Asyncio + aiohttp"
+        products, elapsed, mode_name = run_selected_mode(
+            args.mode
+        )
 
     report = analyze_products(products)
 
@@ -70,7 +112,7 @@ def main():
         print(f"\nProduct {number}")
         print(f"  ID: {product.id}")
         print(f"  Name: {product.name}")
-        print(f"  Price: ${product.price:.2f}")
+        print("  Price: " + "$" + "{:.2f}".format(product.price))
         print(f"  Category: {product.category}")
         print(f"  Average Score: {product.avg_score:.1f}")
         print(f"  Review Count: {product.review_count}")
@@ -91,7 +133,7 @@ def main():
         print(f"\nTop Product {number}")
         print(f"  ID: {product.id}")
         print(f"  Name: {product.name}")
-        print(f"  Price: ${product.price:.2f}")
+        print("  Price: " + "$" + "{:.2f}".format(product.price))
         print(f"  Category: {product.category}")
         print(f"  Average Score: {product.avg_score:.1f}")
         print(f"  Review Count: {product.review_count}")
