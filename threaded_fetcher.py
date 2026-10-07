@@ -5,13 +5,12 @@ from scraper import scrape_product_review
 
 
 def fetch_all_threaded():
-    """Fetch API products and scrape their review pages concurrently."""
+    """Fetch API products and scrape successful review pages concurrently."""
 
     products = fetch_product_data()
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        reviewed_products = list(
-            executor.map(scrape_product_review, products)
-        )
+        results = executor.map(scrape_product_review, products)
+        reviewed_products = [product for product in results if product is not None]
 
     return reviewed_products
