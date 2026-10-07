@@ -97,6 +97,23 @@ def main():
         )
 
     report = analyze_products(products)
+ 
+    if not products:
+        print(
+            "\nNo data was returned. The upstream services must respond with "
+            "HTTP 200. No fallback or fabricated data was used."
+        )
+
+        save_report(
+            report,
+            filename=f"report_{args.mode}.json",
+        )
+
+        print(
+            f"\nEmpty report saved to report_{args.mode}.json"
+        )
+        return
+
 
     print("\nData aggregation completed.")
     print(f"Mode: {mode_name}")
