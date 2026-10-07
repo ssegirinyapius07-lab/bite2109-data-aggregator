@@ -100,9 +100,7 @@ The project contains eleven unit tests. They verify:
 10. Review timeout errors return no data.
 11. Valid HTTP 200 review responses are parsed correctly.
 
-The test suite passed with:
-
-**11 tests passed, 0 failed.**
+The updated test suite contains 11 unit tests covering the normal API path and the new failure cases. The checks were validated in an isolated local test environment with all 11 tests passing.
 
 Run tests with:
 
